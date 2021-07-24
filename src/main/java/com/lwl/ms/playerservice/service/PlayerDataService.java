@@ -4,7 +4,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.annotation.PostConstruct;
 
@@ -20,6 +22,9 @@ import lombok.extern.slf4j.Slf4j;
 public class PlayerDataService {
 
 	private static final List<Player> PLAYERS_LIST = new ArrayList<>();
+
+	private static final Set<String> LABELS = new HashSet<>();
+	private static final Set<String> ROLES = new HashSet<>();
 
 	private static final String SEP = ",";
 
@@ -60,11 +65,29 @@ public class PlayerDataService {
 		String amount = playerArr[1];
 		String role = playerArr[2];
 		String label = playerArr[3];
+		LABELS.add(label);
+		ROLES.add(role);
 		return new Player(name, role, Double.valueOf(amount), label);
 	}
 
 	public List<Player> getPlayers() {
 		return PLAYERS_LIST;
+	}
+
+	public Set<String> getRoles() {
+		return ROLES;
+	}
+
+	public Set<String> getLabels() {
+		return LABELS;
+	}
+
+	public boolean isValidRole(String role) {
+		return ROLES.contains(role);
+	}
+
+	public boolean isValidLabel(String label) {
+		return LABELS.contains(label);
 	}
 
 }
