@@ -1,6 +1,7 @@
 package com.lwl.ms.playerservice.service;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -9,9 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
 import com.lwl.ms.playerservice.domain.Player;
-import com.lwl.ms.playerservice.domain.RoleAmount;
-import com.lwl.ms.playerservice.domain.RoleCount;
+import com.lwl.ms.playerservice.domain.RoleAmountCount;
 import com.lwl.ms.playerservice.domain.TeamAmount;
+import com.lwl.ms.playerservice.domain.TotalAndRoleAmount;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -46,12 +47,12 @@ public class PlayerServiceImpl implements PlayerService {
 	@Override
 	public List<Player> getPlayersByLabel(String label) {
 		Assert.hasLength(label, "label is empty");
-		
+
 		/*
 		 * if (!playerDataService.isValidLabel(label)) { throw new
 		 * IllegalArgumentException("Invalid label : '" + label + "'"); }
 		 */
-		
+
 		List<Player> players = playerDataService.getPlayers();
 		List<Player> searchList = new ArrayList<>();
 		players.parallelStream().forEach(p -> {
@@ -105,33 +106,90 @@ public class PlayerServiceImpl implements PlayerService {
 	}
 
 	@Override
-	public List<RoleCount> getRoleCountByLabel(String label) {
+	public List<RoleAmountCount> getRoleAndAmountByLabel(String label) {
 		Assert.hasLength(label, "label is empty");
-		List<RoleCount> roleCountList = new ArrayList<>();
+		List<RoleAmountCount> roleCountList = new ArrayList<>();
+		log.info("Computing Role wise Amount for label {}", label);
 		List<Player> players = getPlayersByLabel(label);
 		Set<String> roles = playerDataService.getRoles();
+		Iterator<String> it = roles.iterator();
 		int count = 0;
-		roles.forEach(r -> {
-			players.parallelStream().forEach(p -> {
-				if (p.getRole().equals(r)) {
-					// Need to work here
+		double amount = 0;
+		while (it.hasNext()) {
+			String role = it.next();
+			count = 0;
+			amount = 0;
+			for (Player p : players) {
+				if (p.getRole().equals(role)) {
+					count++;
+					amount = Double.sum(amount, p.getAmount());
 				}
-			});
-		});
-
+			}
+			roleCountList.add(RoleAmountCount.builder().count(count).role(role).amount(amount).build());
+		}
+		log.info("Computed Role wise Amount for label {}", label);
 		return roleCountList;
 	}
 
 	@Override
 	public List<TeamAmount> getTeamAmount() {
-		// TODO Auto-generated method stub
-		return null;
+		List<TeamAmount> list = new ArrayList<>();
+		Set<String> labels = playerDataService.getLabels();
+		log.info("Computing total amount for {} teams", labels.size());
+		Iterator<String> it = labels.iterator();
+		while (it.hasNext()) {
+			String label = it.next();
+			List<Player> players = getPlayersByLabel(label);
+			double amount = 0;
+			for (Player p : players) {
+				amount = Double.sum(amount, p.getAmount());
+			}
+			list.add(TeamAmount.builder().amount(amount).label(label).build());
+		}
+		return list;
 	}
 
 	@Override
-	public List<RoleAmount> getRoleAmountByTeam(String label) {
-		// TODO Auto-generated method stub
-		return null;
+	public List<TotalAndRoleAmount> getRoleAndAmount() {
+		List<TotalAndRoleAmount> list = new ArrayList<>();
+		Set<String> labels = playerDataService.getLabels();
+		log.info("Computing Total and role amount for {} teams", labels.size());
+		Iterator<String> it = labels.iterator();
+		while (it.hasNext()) {
+			String label = it.next();
+			TotalAndRoleAmount totalAndRoleAmount = computeRoleAndAmount(label);
+			list.add(totalAndRoleAmount);
+		}
+		log.info("Computed for {} teams", list.size());
+		return list;
+	}
+
+	private TotalAndRoleAmount computeRoleAndAmount(String label) {
+		log.info("Computing Total and role wise amount for Team: {}", label);
+		List<Player> players = getPlayersByLabel(label);
+
+		Set<String> roles = playerDataService.getRoles();
+
+		List<RoleAmountCount> roleWiseList = new ArrayList<>();
+
+		Iterator<String> it = roles.iterator();
+		int count = 0;
+		double roleAmount = 0;
+		double totalAmount = 0;
+		while (it.hasNext()) {
+			String role = it.next();
+			count = 0;
+			roleAmount = 0;
+			for (Player p : players) {
+				if (p.getRole().equals(role)) {
+					count++;
+					roleAmount = Double.sum(roleAmount, p.getAmount());
+				}
+			}
+			roleWiseList.add(RoleAmountCount.builder().count(count).role(role).amount(roleAmount).build());
+			totalAmount = Double.sum(totalAmount, roleAmount);
+		}
+		return new TotalAndRoleAmount(label, totalAmount, roleWiseList);
 	}
 
 }
