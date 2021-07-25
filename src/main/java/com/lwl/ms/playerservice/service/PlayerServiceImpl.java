@@ -1,137 +1,81 @@
 package com.lwl.ms.playerservice.service;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
-
 import com.lwl.ms.playerservice.domain.Player;
 import com.lwl.ms.playerservice.domain.RoleAmount;
 import com.lwl.ms.playerservice.domain.RoleCount;
 import com.lwl.ms.playerservice.domain.TeamAmount;
-
 import lombok.extern.slf4j.Slf4j;
+
 
 @Service
 @Slf4j
 public class PlayerServiceImpl implements PlayerService {
 
-	@Autowired
-	private PlayerDataService playerDataService;
+	private final PlayerDataService playerDataService;
+	private final List<Player> players;
 
-	@Override
-	public List<Player> getAllPlayers() {
-		log.info("Retrieving all players info.....");
-		return playerDataService.getPlayers();
-	}
-
-	@Override
-	public List<Player> searchPlayer(String name) {
-		Assert.hasLength(name, "name is empty");
-		String n = name.toLowerCase();
-		List<Player> players = playerDataService.getPlayers();
-		List<Player> searchList = new ArrayList<>();
-		players.parallelStream().forEach(p -> {
-			if (p.getName().toLowerCase().contains(n)) {
-				searchList.add(p);
-			}
-		});
-		log.info("Found {} Players for name {}", searchList.size(), name);
-		return searchList;
-	}
+	public PlayerServiceImpl(PlayerDataService playerDataService){
+		this.playerDataService = playerDataService;
+		this.players = playerDataService.getPlayers();
+    }
 
 	@Override
 	public List<Player> getPlayersByLabel(String label) {
-		Assert.hasLength(label, "label is empty");
-		
-		/*
-		 * if (!playerDataService.isValidLabel(label)) { throw new
-		 * IllegalArgumentException("Invalid label : '" + label + "'"); }
-		 */
-		
-		List<Player> players = playerDataService.getPlayers();
-		List<Player> searchList = new ArrayList<>();
-		players.parallelStream().forEach(p -> {
-			if (p.getLabel().equals(label)) {
-				searchList.add(p);
-			}
-		});
-		log.info("Found {} Players for label {}", searchList.size(), label);
-		return searchList;
-	}
-
-	@Override
-	public List<Player> getPlayersByRole(String role) {
-		Assert.hasLength(role, "role is empty");
-
-		/*
-		 * if (!playerDataService.isValidRole(role)) { throw new
-		 * IllegalArgumentException("Invalid role : '" + role + "'"); }
-		 */
-		List<Player> players = playerDataService.getPlayers();
-		List<Player> searchList = new ArrayList<>();
-		players.parallelStream().forEach(p -> {
-			if (p.getRole().equals(role)) {
-				searchList.add(p);
-			}
-		});
-		log.info("Found {} Players for role {}", searchList.size(), role);
-		return searchList;
-	}
-
-	@Override
-	public List<Player> getPlayersByLabelAndRole(String label, String role) {
-		Assert.hasLength(label, "label is empty");
-		Assert.hasLength(role, "role is empty");
-
-		/*
-		 * if (!(playerDataService.isValidLabel(label) &&
-		 * playerDataService.isValidRole(role))) { String err = "Invalid label or role";
-		 * throw new IllegalArgumentException(err); }
-		 */
-
-		List<Player> players = playerDataService.getPlayers();
-		List<Player> searchList = new ArrayList<>();
-		players.parallelStream().forEach(p -> {
-			if (p.getLabel().equals(label) && p.getRole().equals(role)) {
-				searchList.add(p);
-			}
-		});
-		log.info("Found {} Players for label {} and role {}", searchList.size(), label, role);
+		Assert.hasLength(label, "Label can't be is empty or null");
+		log.info("Looking for players of {}",label);
+		List<Player> searchList = players.stream().filter(p->p.getLabel().equalsIgnoreCase(label))
+				                  .collect(Collectors.toList());
+		log.info("Total {} Players for label {}", searchList.size(), label);
 		return searchList;
 	}
 
 	@Override
 	public List<RoleCount> getRoleCountByLabel(String label) {
-		Assert.hasLength(label, "label is empty");
-		List<RoleCount> roleCountList = new ArrayList<>();
-		List<Player> players = getPlayersByLabel(label);
-		Set<String> roles = playerDataService.getRoles();
-		int count = 0;
-		roles.forEach(r -> {
-			players.parallelStream().forEach(p -> {
-				if (p.getRole().equals(r)) {
-					// Need to work here
-				}
-			});
+		Assert.hasLength(label, "Label can't be is empty or null");
+		List<RoleCount> roleCounts = new ArrayList<>();
+		log.info("Looking for label {} role count",label);
+		players.stream().filter(p->p.getLabel().equalsIgnoreCase(label))
+				.collect(Collectors.groupingBy(Player::getRole)).forEach((k,v)->{
+			log.info("Team {} and role {} has {} players",label,k,v.size());
+			int count = v.size();
+			RoleCount roleCount = RoleCount.builder().count(count).role(k).build();
+			roleCounts.add(roleCount);
 		});
+		return roleCounts;
 
-		return roleCountList;
 	}
 
 	@Override
-	public List<TeamAmount> getTeamAmount() {
-		// TODO Auto-generated method stub
-		return null;
+	public List<TeamAmount> getAmountSpentByAllTeams() {
+		List<TeamAmount> teamAmounts = new ArrayList<>();
+		players.stream().collect(Collectors.groupingBy(Player::getLabel)).forEach((key,value)->{
+				log.info("Team {} has {} players",key,value.size());
+				double amount = value.stream().mapToDouble(Player::getAmount).sum();
+				int count = value.size();
+				String label = key;
+				TeamAmount teamAmount = TeamAmount.builder().label(label).count(count).amount(amount).build();
+				teamAmounts.add(teamAmount);
+		});
+		return teamAmounts;
 	}
 
 	@Override
 	public List<RoleAmount> getRoleAmountByTeam(String label) {
-		// TODO Auto-generated method stub
-		return null;
+		Assert.hasLength(label, "Label can't be is empty or null");
+		List<RoleAmount> roleAmounts = new ArrayList<>();
+		log.info("Looking for label {} role amount",label);
+		players.stream().filter(p->p.getLabel().equalsIgnoreCase(label))
+				.collect(Collectors.groupingBy(Player::getRole)).forEach((k,v)->{
+					log.info("Team {} and role {} has {} players",label,k,v.size());
+					double amount = v.stream().mapToDouble(Player::getAmount).sum();
+					RoleAmount roleAmount = RoleAmount.builder().name(k).amount(amount).build();
+					roleAmounts.add(roleAmount);
+		});
+		return roleAmounts;
 	}
 
 }

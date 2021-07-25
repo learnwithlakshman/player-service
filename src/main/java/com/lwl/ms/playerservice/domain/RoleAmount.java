@@ -1,13 +1,13 @@
 package com.lwl.ms.playerservice.domain;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 public class RoleAmount {
-
+	private String name;
 	private double amount;
-	private String label;
-
 }
